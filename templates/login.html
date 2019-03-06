@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Login</title>
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+  		<script src="//apis.google.com/js/platform.js?onload=start"> </script>
+	</head>
+	<body>
+		<div id="signinButton">
+			<span class="g-signin"
+				data-scope="openid email"
+				data-clientid="302596172903-r5dshhnha4u9m4a7em7qe7bhfqbmri8v.apps.googleusercontent.com"
+				data-redirecturi="postmessage"
+				data-accesstype="offline"
+				data-cookiepolicy="single_host_origin"
+				data-callback="signInCallback"
+				data-approvalprompt="force"></span>
+		</div>
+		<div id="result"></div>
+		<script>
+			function signInCallback(authResult) {
+				if (authResult['code']){
+					$('#result').attr('atyle', 'display:none');
+					$.ajax ({
+						type: 'POST',
+						url: '/gconnect?state={{STATE}}',
+						processData: false,
+						contentType: 'application/octet-stream; charset=utf-8',
+						data: authResult['code'],
+						success: function(result) {
+							if (result) {
+								$('#result').html('Login efetuado com sucesso </br>' + result + '</br>Redirecionando....')
+								setTimeout( function() { 
+									window.location.href="/restaurant";
+									}, 10000);
+							}
+							else if (authResult['error']) {
+								console.log('Erro' + authResult['error']);
+							}
+							else {
+								$('#result').html('Erro ao tentar fazer uma chamada no servidor, cheque o console.');
+							}
+						}
+					});
+				}
+			}
+		</script>
+	</body>
+</html>
