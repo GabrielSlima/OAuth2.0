@@ -6,17 +6,6 @@
   		<script src="//apis.google.com/js/platform.js?onload=start"> </script>
 	</head>
 	<body>
-		<div id="signinButton">
-			<span class="g-signin"
-				data-scope="openid email"
-				data-clientid="302596172903-r5dshhnha4u9m4a7em7qe7bhfqbmri8v.apps.googleusercontent.com"
-				data-redirecturi="postmessage"
-				data-accesstype="offline"
-				data-cookiepolicy="single_host_origin"
-				data-callback="signInCallback"
-				data-approvalprompt="force"></span>
-		</div>
-		<div id="result"></div>
 		<script>
 			function signInCallback(authResult) {
 				if (authResult['code']){
@@ -45,5 +34,55 @@
 				}
 			}
 		</script>
+		<script>
+			window.fbAsyncInit = function() {
+            FB.init({
+            appId            : '515509658854974',
+            autoLogAppEvents : true,
+            xfbml            : true,
+            version          : 'v2.9'
+            });
+        };
+		function sendTokenToServer(response) {
+			console.log(FB.getAuthResponse());
+			var accessToken = FB.getAuthResponse()['accessToken'];
+			console.log(accessToken);
+			FB.api('/me', function(response){
+				$.ajax({
+					type: 'POST',
+					url: '/fbconnect?state={{STATE}}',
+					processData: false,
+					data: accessToken,
+					contentType: 'application/octet-stream; charset=utf-8',
+					success: function(){
+						if (result) {
+							setTimeout(function(){
+								window.location.href="/restaurant";
+							});
+						}
+						else {
+							alert('Houve um error na tentativa de envio de dados para o servidor. Atualize a pagina e tente fazer login novamente.');
+						}
+					}
+				});
+			});
+
+		}
+		</script>
+		<script async defer src="https://connect.facebook.net/en_US/sdk.js"></script>
+		<div id="fb-root"></div>
+		<fb:login-button scope="public_profile,email" onlogin="sendTokenToServer();"></fb:login-button>
+		<div id="signinButton">
+			<span class="g-signin")
+				data-scope="openid email"
+				data-clientid="302596172903-r5dshhnha4u9m4a7em7qe7bhfqbmri8v.apps.googleusercontent.com"
+				data-redirecturi="postmessage"
+				data-accesstype="offline"
+				data-cookiepolicy="single_host_origin"
+				data-callback="signInCallback"
+				data-approvalprompt="force"><img src="https://cdn2.iconfinder.com/data/icons/social-networking-package-1-1/512/networks_-_social_-_web-05-2-512.png" style="width:50px;height:50px;" alt=""></span>
+		</div>
+		<div id="result"></div>
+
 	</body>
 </html>

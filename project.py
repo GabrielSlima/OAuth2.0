@@ -48,7 +48,7 @@ def getUserInfos(user_id):
 def getUserId(user_email):
   try:
     user_id = session.query(User).filter_by(email = user_email).one()
-    return user_id
+    return user_id.id
   except:
     return None
 
@@ -58,10 +58,66 @@ def showLogin():
   login_session['state'] = state
   return render_template('login.html', STATE=state)
 
+@app.route('/fbconnect', methods=['POST'])
+def fbconnect():
+  httplib = httplib2.Http()
+  if request.args.get('state') != login_session['state']:
+    response = make_response(json.dumps('Algo deu errado!'+
+    'Você aparentemente não é o mesmo cliente desde o inicio' + 
+    'do processo de login, por favor, tente efetuar o login novamente'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+  storedAcessToken = login_session.get('access_token')
+  if storedAcessToken is not None:
+    response = make_response(json.dumps('Você já efetuou logon...'), 200)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  access_token = request.data.decode('utf-8')
+  FB_CLIENT_SECRETS = open('fb_client_secrets.json', 'r').read()
+  print(FB_CLIENT_SECRETS)
+  app_id = json.loads(FB_CLIENT_SECRETS)['web']['app_id']
+  app_secret = json.loads(FB_CLIENT_SECRETS)['web']['app_secret']
+  print('ACCESS TOKEN: %s' % access_token)
+  print('APP ID: %s' % app_id)
+  print('APP SECRET: %s' % app_secret)
+  print('TROCANDO TOKEN DE CURTO PRAZA POR UM A LONGO PRAZO.')
+  url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' % (app_id, app_secret, access_token)
+  
+  result = httplib.request(url, 'GET')[1]
+  access_token = json.loads(result.decode('utf-8'))['access_token']
+  print('TOKEN A LONGO PRAZO: %s' % access_token)
+  login_session['access_token'] = access_token
+  print('PEGANDO INFOS DO USUARIO.')
+  url = 'https://graph.facebook.com/v2.8/me?access_token=%s&fields=name,id,email' % access_token
+  result = httplib.request(url, 'GET')[1]
+  print(result)
+  data = json.loads(result)
+  print(data)
+  print(data['name'])
+  print(data['email'])
+  print(data['id'])
+  login_session['provider'] = 'facebook'
+  login_session['email'] = data['email']
+  login_session['username'] = data['name']
+  login_session['facebook_id'] = data['id']
+
+  url = 'https://graph.facebook.com/v2.8/me/picture?access_token=%s&redirect=0&height=200&width=200' % access_token
+  result = httplib.request(url, 'GET')[1]
+  data = json.loads(result)
+  login_session['picture'] = data['data']['url']
+  print(login_session['picture'])
+
+  user_id = getUserId(login_session['email'])
+  if not user_id:
+    user_id = createNewUser(login_session)
+  print(user_id)
+  login_session['user_id'] = user_id
+
+  return 'LOGIN EFETUADO COM SUCESSO!'
+
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
-  print()
-  print('TOKEN DE SESSÃO DO NOSSO APP')
   print(login_session['state'])
   request.args.get('state')
   if request.args.get('state') != login_session['state']:
@@ -129,6 +185,7 @@ def gconnect():
   print(resposta)
   pprint.pprint(resposta.json())
   dados_resposta = resposta.json()
+  login_session['provider'] = 'google'
   login_session['username'] = dados_resposta['name']
   login_session['email'] = dados_resposta['email']
   login_session['picture'] = dados_resposta['picture']
@@ -151,34 +208,34 @@ def gconnect():
   
   return output
 
-@app.route('/gdisconnect')
-def gdisconnect():
+@app.route('/disconnect')
+def disconnect():
   token_acesso = login_session['access_token']
   if token_acesso is None:
     response = make_response(json.dumps('Não há usuarios logados para desconectar.'), 401)
     response.headers['Content-Type'] = 'application/json'
     return response
-  
-  url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' %login_session['access_token']
-  httplib = httplib2.Http()
-  resposta = httplib.request(url, 'GET')[0]
-
-  print()
-  print('RESPOSTA DA TENTATIVA DE DESLOGAR DA CONTA')
-  print(resposta)
-  if resposta['status'] == '200':
-    del login_session['access_token']
+  if login_session['provider'] == 'google':
+    print('DESCONECTANDO DO GOOGLE')
+    print(login_session['access_token'])
+    url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' %login_session['access_token']
+    httplib = httplib2.Http()
+    resposta = httplib.request(url, 'GET')[0]
+    print()
+    print('RESPOSTA DA TENTATIVA DE DESLOGAR DA CONTA')
+    print(resposta)
     del login_session['gplus_id']
-    del login_session['username']
-    del login_session['email']
-    del login_session['picture']
-    response = make_response(json.dumps('Desconectado com sucesso, redirecionando...'), 200)
-    response.headers['Content-Type'] = 'application/json'
-    return response
-  else:
-    response = make_response(json.dumps('Falha ao tentar desconectar da conta.'), 400)
-    response.headers['Content-Type'] = 'application/json'
-    return response
+    print('ID DELETADO')
+  if login_session['provider'] == 'facebook':
+    del login_session['facebook_id']
+  
+  del login_session['access_token']
+  del login_session['username']
+  del login_session['email']
+  del login_session['picture']
+  response = make_response(json.dumps('Desconectado com sucesso, redirecionando...'), 200)
+  response.headers['Content-Type'] = 'application/json'
+  return response
 #JSON APIs to view Restaurant Information
 @app.route('/restaurant/<int:restaurant_id>/menu/JSON')
 def restaurantMenuJSON(restaurant_id):
